@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/paprika.png" width="110" alt="Paprika logo">
+  <img src="assets/paprika.png" width="110" alt="Paprika Launcher logo">
 </p>
 
-<h1 align="center">Paprika</h1>
-<p align="center"><b>A spicy, lightweight Minecraft launcher for Linux and Windows, with Modrinth built in.</b></p>
+<h1 align="center">Paprika Launcher</h1>
+<p align="center"><b>A lightweight Minecraft launcher for Linux and Windows, with Modrinth built in.</b></p>
 <p align="center">Made by <a href="https://github.com/yeeboein">Yeeboein</a></p>
 
 ---
 
-Paprika is a small, fast Minecraft: Java Edition launcher. It's one native app (about 5–7 MB) with no Electron, no Java needed to run the launcher, and nothing to install first.
+Paprika Launcher is a small, fast Minecraft: Java Edition launcher. It's one native app (about 5–7 MB) with no Electron, no Java needed to run the launcher, and nothing to install first.
 
 What makes it different: **Modrinth is part of the launcher.** Browse mods, modpacks, resource packs and shaders inside the app, click **Install**, and they go straight into your instance with their dependencies. You can add mods whenever you like, before or after you've started playing.
 
@@ -68,7 +68,7 @@ Microsoft login needs an Azure app "client ID". Every third-party launcher has i
 3. Open the app → **Authentication** → turn on **Allow public client flows**.
 4. Copy the **Application (client) ID**.
 5. New apps also need Minecraft API access: submit the app ID with [Mojang's review form](https://aka.ms/mce-reviewappid).
-6. Paste the ID into **Paprika → Settings → Microsoft client ID**, or bake it into builds by setting the `PAPRIKA_MSA_CLIENT_ID` environment variable at build time. For GitHub builds, add a repository *variable* with that name.
+6. Paste the ID into **Paprika Launcher → Settings → Microsoft client ID**, or bake it into builds by setting the `PAPRIKA_MSA_CLIENT_ID` environment variable at build time. For GitHub builds, add a repository *variable* with that name.
 
 Offline accounts work without any of this.
 

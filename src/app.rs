@@ -105,7 +105,7 @@ impl PaprikaApp {
             tasks::repaint();
         });
         tasks::log(format!(
-            "[paprika] Paprika {} by Yeeboein - data folder: {}",
+            "[paprika] Paprika Launcher {} by Yeeboein - data folder: {}",
             env!("CARGO_PKG_VERSION"),
             crate::paths::root().display()
         ));
@@ -368,18 +368,14 @@ impl PaprikaApp {
     fn sidebar(&mut self, ui: &mut Ui) {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
-            let (rect, _) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::hover());
-            theme::draw_pepper(ui.painter(), rect.center(), 40.0);
-            ui.vertical(|ui| {
-                ui.add_space(2.0);
-                ui.label(
-                    RichText::new("Paprika")
-                        .size(22.0)
-                        .strong()
-                        .color(Color32::WHITE),
-                );
-                ui.label(RichText::new("spicy launcher").size(11.0).color(TEXT_DIM));
-            });
+            let (rect, _) = ui.allocate_exact_size(vec2(44.0, 44.0), Sense::hover());
+            theme::paint_logo(ui, rect.center(), 44.0);
+            ui.label(
+                RichText::new("Paprika Launcher")
+                    .size(17.0)
+                    .strong()
+                    .color(Color32::WHITE),
+            );
         });
         ui.add_space(22.0);
         for (page, icon, label) in [
@@ -528,7 +524,7 @@ impl PaprikaApp {
                     Loader::Quilt => Color32::from_rgb(58, 46, 66),
                 };
                 ui.painter().rect_filled(rect, 8, bg);
-                theme::draw_pepper(ui.painter(), rect.center(), size * 0.8);
+                theme::paint_logo(ui, rect.center(), size * 0.8);
             }
         }
     }
@@ -569,7 +565,7 @@ impl PaprikaApp {
             ui.add_space(60.0);
             ui.vertical_centered(|ui| {
                 let (rect, _) = ui.allocate_exact_size(vec2(90.0, 90.0), Sense::hover());
-                theme::draw_pepper(ui.painter(), rect.center(), 90.0);
+                theme::paint_logo(ui, rect.center(), 90.0);
                 ui.label(RichText::new("Nothing cooking yet").size(20.0).strong());
                 ui.label(
                     RichText::new("Create an instance, or grab a modpack from Browse Modrinth.")
@@ -1193,7 +1189,7 @@ impl PaprikaApp {
                                         let (rect, _) = ui
                                             .allocate_exact_size(vec2(64.0, 64.0), Sense::hover());
                                         ui.painter().rect_filled(rect, 10, CARD_HOVER);
-                                        theme::draw_pepper(ui.painter(), rect.center(), 46.0);
+                                        theme::paint_logo(ui, rect.center(), 46.0);
                                     }
                                 }
                                 ui.vertical(|ui| {
@@ -1537,9 +1533,9 @@ impl PaprikaApp {
             ui.separator();
             ui.horizontal(|ui| {
                 let (rect, _) = ui.allocate_exact_size(vec2(34.0, 34.0), Sense::hover());
-                theme::draw_pepper(ui.painter(), rect.center(), 34.0);
+                theme::paint_logo(ui, rect.center(), 34.0);
                 ui.vertical(|ui| {
-                    ui.label(RichText::new(format!("Paprika {}", env!("CARGO_PKG_VERSION"))).strong());
+                    ui.label(RichText::new(format!("Paprika Launcher {}", env!("CARGO_PKG_VERSION"))).strong());
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Made by Yeeboein ·").color(TEXT_DIM));
                         ui.hyperlink_to("GitHub", "https://github.com/yeeboein/paprika-launcher");

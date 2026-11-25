@@ -1,4 +1,4 @@
-// Paprika - a lightweight Minecraft launcher by Yeeboein.
+// Paprika Launcher - a lightweight Minecraft launcher by Yeeboein.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
@@ -20,7 +20,7 @@ fn main() -> eframe::Result<()> {
     let _ = std::fs::create_dir_all(paths::instances());
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Paprika")
+            .with_title("Paprika Launcher")
             .with_app_id("paprika")
             .with_inner_size([1120.0, 720.0])
             .with_min_inner_size([820.0, 520.0])
@@ -28,7 +28,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "Paprika",
+        "Paprika Launcher",
         options,
         Box::new(|cc| Ok(Box::new(app::PaprikaApp::new(cc)))),
     )
