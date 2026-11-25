@@ -8,7 +8,7 @@ use crate::loaders::Loader;
 use crate::modrinth::{self, ProjectType, SearchHit, SearchResults, Sort};
 use crate::mojang::Manifest;
 use crate::tasks::{self, TaskManager, TaskRef};
-use crate::theme::{self, ACCENT, ACCENT_HOVER, CARD, CARD_HOVER, GREEN, ORANGE, PANEL, TEXT_DIM};
+use crate::theme::{self, ACCENT, CARD, CARD_HOVER, GREEN, ORANGE, PANEL, TEXT_DIM};
 use eframe::egui::{self, vec2, Align, Color32, Frame, Layout, RichText, Sense, Stroke, Ui};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -60,6 +60,47 @@ struct Browse {
     needs_search: bool,
 }
 
+struct MsSetup {
+    step: usize,
+    client_id: String,
+}
+
+const AZURE_APPS_URL: &str =
+    "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade";
+const MOJANG_REVIEW_URL: &str = "https://aka.ms/mce-reviewappid";
+
+fn looks_like_client_id(s: &str) -> bool {
+    let s = s.trim();
+    s.len() == 36
+        && s.chars().enumerate().all(|(i, c)| {
+            if [8, 13, 18, 23].contains(&i) {
+                c == '-'
+            } else {
+                c.is_ascii_hexdigit()
+            }
+        })
+}
+
+/// Turn Microsoft/Mojang sign-in errors into something a player can act on.
+fn friendly_login_error(e: &str) -> String {
+    if e.contains("AADSTS7000218") || e.contains("AADSTS70002") {
+        "In Azure, open your app > Authentication > turn on “Allow public client flows”, save, then try again.".into()
+    } else if e.contains("AADSTS700016") || e.contains("AADSTS90002") {
+        "Microsoft doesn't recognise that client ID. Check you copied the “Application (client) ID” (Accounts > Set up Microsoft sign-in).".into()
+    } else if e.contains("AADSTS50020")
+        || e.contains("AADSTS50194")
+        || e.contains("unauthorized_client")
+    {
+        "Your Azure app must allow personal Microsoft accounts. Re-create it with “Personal Microsoft accounts only”.".into()
+    } else if e.contains("Invalid app registration")
+        || e.contains("login_with_xbox") && e.contains("403")
+    {
+        "Microsoft sign-in worked, but Mojang hasn't approved your client ID for Minecraft yet. Submit it at aka.ms/mce-reviewappid (setup step 4) - approval can take a few days.".into()
+    } else {
+        e.to_string()
+    }
+}
+
 struct MsLogin {
     code: Option<DeviceCode>,
     cancel: Arc<AtomicBool>,
@@ -82,6 +123,7 @@ pub struct PaprikaApp {
     installing: HashMap<String, TaskRef>,
     running: Running,
     ms_login: Option<MsLogin>,
+    ms_setup: Option<MsSetup>,
     offline_name: String,
     confirm_delete: Option<String>,
     rename_buf: String,
@@ -137,6 +179,7 @@ impl PaprikaApp {
             installing: HashMap::new(),
             running: Running::default(),
             ms_login: None,
+            ms_setup: None,
             offline_name: String::new(),
             confirm_delete: None,
             rename_buf: String::new(),
@@ -211,7 +254,7 @@ impl PaprikaApp {
                 }
                 Msg::Login(Err(e)) => {
                     if let Some(l) = &mut self.ms_login {
-                        l.error = Some(e);
+                        l.error = Some(friendly_login_error(&e));
                         l.code = None;
                     }
                 }
@@ -331,10 +374,10 @@ impl PaprikaApp {
                 .instance(&target)
                 .map(|i| i.name.clone())
                 .unwrap_or_default();
-            self.tasks
-                .spawn(format!("Installing {title} → {inst_name}"), move |task| {
-                    modrinth::install(&target, &pid, &title, icon, ptype, task)
-                })
+            self.tasks.spawn(
+                format!("Installing {title} into {inst_name}"),
+                move |task| modrinth::install(&target, &pid, &title, icon, ptype, task),
+            )
         };
         self.installing.insert(hit.project_id.clone(), task);
     }
@@ -386,18 +429,7 @@ impl PaprikaApp {
             (Page::Console, "🖥", "Console"),
         ] {
             let active = self.page == page;
-            let text = RichText::new(format!("{icon}   {label}"))
-                .size(15.0)
-                .color(if active { Color32::WHITE } else { TEXT_DIM });
-            let btn = egui::Button::new(text)
-                .fill(if active {
-                    ACCENT.linear_multiply(0.85)
-                } else {
-                    Color32::TRANSPARENT
-                })
-                .stroke(Stroke::NONE)
-                .min_size(vec2(ui.available_width(), 38.0));
-            if ui.add(btn).clicked() {
+            if theme::nav_item(ui, icon, label, active).clicked() {
                 if page == Page::Library && self.page == Page::Library {
                     self.selected = None;
                 }
@@ -492,19 +524,7 @@ impl PaprikaApp {
     }
 
     fn accent_button(ui: &mut Ui, text: &str, enabled: bool) -> egui::Response {
-        let btn = egui::Button::new(RichText::new(text).strong().color(Color32::WHITE))
-            .fill(ACCENT)
-            .min_size(vec2(0.0, 32.0));
-        let r = ui.add_enabled(enabled, btn);
-        if r.hovered() {
-            ui.painter().rect_stroke(
-                r.rect,
-                7,
-                Stroke::new(1.5_f32, ACCENT_HOVER),
-                egui::StrokeKind::Outside,
-            );
-        }
-        r
+        theme::anim_button(ui, text, ACCENT, vec2(0.0, 32.0), 14.0, enabled)
     }
 
     fn instance_icon(ui: &mut Ui, inst: &Instance, size: f32) {
@@ -616,28 +636,29 @@ impl PaprikaApp {
                                             );
                                             ui.add_space(4.0);
                                             if running {
-                                                if ui
-                                                    .add(
-                                                        egui::Button::new("■  Stop")
-                                                            .min_size(vec2(150.0, 30.0)),
-                                                    )
-                                                    .clicked()
+                                                if theme::anim_button(
+                                                    ui,
+                                                    "■  Stop",
+                                                    CARD_HOVER,
+                                                    vec2(150.0, 30.0),
+                                                    14.0,
+                                                    true,
+                                                )
+                                                .clicked()
                                                 {
                                                     action = Some((inst.id.clone(), "stop"));
                                                 }
                                             } else if launching {
                                                 ui.add(egui::Spinner::new());
-                                            } else if ui
-                                                .add(
-                                                    egui::Button::new(
-                                                        RichText::new("▶  Play")
-                                                            .strong()
-                                                            .color(Color32::WHITE),
-                                                    )
-                                                    .fill(ACCENT)
-                                                    .min_size(vec2(150.0, 30.0)),
-                                                )
-                                                .clicked()
+                                            } else if theme::anim_button(
+                                                ui,
+                                                "▶  Play",
+                                                ACCENT,
+                                                vec2(150.0, 30.0),
+                                                14.0,
+                                                true,
+                                            )
+                                            .clicked()
                                             {
                                                 action = Some((inst.id.clone(), "play"));
                                             }
@@ -647,12 +668,17 @@ impl PaprikaApp {
                             })
                             .inner;
                         let resp = resp.interact(Sense::click());
-                        if resp.hovered() {
+                        let lift = ui.ctx().animate_bool_with_time(
+                            resp.id.with("lift"),
+                            resp.hovered(),
+                            0.15,
+                        );
+                        if lift > 0.01 {
                             ui.painter().rect_stroke(
-                                resp.rect,
-                                12,
-                                Stroke::new(1.5_f32, ACCENT.linear_multiply(0.7)),
-                                egui::StrokeKind::Inside,
+                                resp.rect.expand(1.5 * lift),
+                                13,
+                                Stroke::new(1.0_f32, CARD_HOVER.gamma_multiply(2.0 * lift)),
+                                egui::StrokeKind::Outside,
                             );
                         }
                         if resp.clicked() && action.is_none() {
@@ -717,29 +743,29 @@ impl PaprikaApp {
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if running {
-                            if ui
-                                .add(
-                                    egui::Button::new(RichText::new("■  Stop").size(16.0))
-                                        .min_size(vec2(130.0, 42.0)),
-                                )
-                                .clicked()
+                            if theme::anim_button(
+                                ui,
+                                "■  Stop",
+                                CARD_HOVER,
+                                vec2(130.0, 42.0),
+                                16.0,
+                                true,
+                            )
+                            .clicked()
                             {
                                 self.stop(id);
                             }
                         } else if launching {
                             ui.add(egui::Spinner::new().size(24.0));
-                        } else if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("▶  Play")
-                                        .size(18.0)
-                                        .strong()
-                                        .color(Color32::WHITE),
-                                )
-                                .fill(ACCENT)
-                                .min_size(vec2(140.0, 42.0)),
-                            )
-                            .clicked()
+                        } else if theme::anim_button(
+                            ui,
+                            "▶  Play",
+                            ACCENT,
+                            vec2(140.0, 42.0),
+                            18.0,
+                            true,
+                        )
+                        .clicked()
                         {
                             self.play(id);
                         }
@@ -1276,7 +1302,7 @@ impl PaprikaApp {
                         let page = self.browse.offset / modrinth::PAGE_SIZE + 1;
                         let pages = self.browse.total.div_ceil(modrinth::PAGE_SIZE).max(1);
                         if ui
-                            .add_enabled(self.browse.offset > 0, egui::Button::new("← Prev"))
+                            .add_enabled(self.browse.offset > 0, egui::Button::new("⬅ Prev"))
                             .clicked()
                         {
                             page_change =
@@ -1287,7 +1313,7 @@ impl PaprikaApp {
                             self.browse.total
                         ));
                         if ui
-                            .add_enabled(page < pages, egui::Button::new("Next →"))
+                            .add_enabled(page < pages, egui::Button::new("Next ➡"))
                             .clicked()
                         {
                             page_change = Some(self.browse.offset + modrinth::PAGE_SIZE);
@@ -1374,31 +1400,27 @@ impl PaprikaApp {
         ui.label(RichText::new("Microsoft").size(17.0).strong());
         let client_id = self.settings.client_id();
         match &mut self.ms_login {
+            None if client_id.is_none() => {
+                ui.label(RichText::new("Microsoft sign-in needs a one-time setup (about 5 minutes). Paprika walks you through it.").color(TEXT_DIM));
+                if Self::accent_button(ui, "⚡  Set up Microsoft sign-in", true).clicked() {
+                    self.ms_setup = Some(MsSetup {
+                        step: 0,
+                        client_id: String::new(),
+                    });
+                }
+            }
             None => {
-                if client_id.is_none() {
-                    ui.label(RichText::new("Add a Microsoft (Azure) client ID in Settings to turn on Microsoft sign-in.").color(ORANGE));
-                }
-                if Self::accent_button(ui, "Sign in with Microsoft", client_id.is_some()).clicked()
-                {
-                    let cancel = Arc::new(AtomicBool::new(false));
-                    self.ms_login = Some(MsLogin {
-                        code: None,
-                        cancel: cancel.clone(),
-                        error: None,
-                    });
-                    let tx = self.tx.clone();
-                    let cid = client_id.unwrap();
-                    std::thread::spawn(move || {
-                        let res = (|| {
-                            let dc = auth::start_device_code(&cid)?;
-                            let _ = tx.send(Msg::DeviceCode(dc.clone()));
-                            tasks::repaint();
-                            auth::finish_device_code(&cid, &dc, &cancel)
-                        })();
-                        let _ = tx.send(Msg::Login(res.map_err(|e| format!("{e:#}"))));
-                        tasks::repaint();
-                    });
-                }
+                ui.horizontal(|ui| {
+                    if Self::accent_button(ui, "Sign in with Microsoft", true).clicked() {
+                        self.start_ms_login(client_id.clone().unwrap());
+                    }
+                    if ui.small_button("Change setup").clicked() {
+                        self.ms_setup = Some(MsSetup {
+                            step: 2,
+                            client_id: self.settings.msa_client_id.clone(),
+                        });
+                    }
+                });
             }
             Some(login) => {
                 let mut close = false;
@@ -1485,6 +1507,134 @@ impl PaprikaApp {
         );
     }
 
+    fn start_ms_login(&mut self, cid: String) {
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.ms_login = Some(MsLogin {
+            code: None,
+            cancel: cancel.clone(),
+            error: None,
+        });
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let res = (|| {
+                let dc = auth::start_device_code(&cid)?;
+                let _ = tx.send(Msg::DeviceCode(dc.clone()));
+                tasks::repaint();
+                auth::finish_device_code(&cid, &dc, &cancel)
+            })();
+            let _ = tx.send(Msg::Login(res.map_err(|e| format!("{e:#}"))));
+            tasks::repaint();
+        });
+    }
+
+    fn ms_setup_window(&mut self, ctx: &egui::Context) {
+        let Some(setup) = &mut self.ms_setup else {
+            return;
+        };
+        let mut open = true;
+        let mut finish = false;
+        const STEPS: usize = 4;
+        egui::Window::new("Set up Microsoft sign-in")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.set_width(460.0);
+                // Step dots with an animated progress bar.
+                let progress = ctx.animate_value_with_time(egui::Id::new("ms_setup_progress"), setup.step as f32 / (STEPS - 1) as f32, 0.25);
+                let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 6.0), Sense::hover());
+                ui.painter().rect_filled(rect, 3.0, CARD_HOVER);
+                ui.painter().rect_filled(egui::Rect::from_min_size(rect.min, vec2(rect.width() * progress, rect.height())), 3.0, ACCENT);
+                ui.add_space(4.0);
+                ui.label(RichText::new(format!("Step {} of {STEPS}", setup.step + 1)).size(12.0).color(TEXT_DIM));
+                ui.add_space(6.0);
+                let big = |ui: &mut Ui, t: &str| ui.label(RichText::new(t).size(18.0).strong().color(Color32::WHITE));
+                match setup.step {
+                    0 => {
+                        big(ui, "1. Create a free Azure app");
+                        ui.label("Microsoft makes every launcher register itself once. It's free; use your normal Microsoft account.");
+                        ui.add_space(4.0);
+                        ui.label("• Click the button below and sign in");
+                        ui.label("• Click “+ New registration”");
+                        ui.horizontal(|ui| {
+                            ui.label("• Name:");
+                            ui.label(RichText::new("Paprika Launcher").monospace().color(ORANGE));
+                            if ui.small_button("📋 Copy").clicked() {
+                                ui.ctx().copy_text("Paprika Launcher".into());
+                            }
+                        });
+                        ui.label("• Account types: “Personal Microsoft accounts only”");
+                        ui.label("• Leave Redirect URI empty, then click Register");
+                        ui.add_space(6.0);
+                        if Self::accent_button(ui, "🌐  Open Azure", true).clicked() {
+                            let _ = open::that(AZURE_APPS_URL);
+                        }
+                    }
+                    1 => {
+                        big(ui, "2. Allow desktop sign-in");
+                        ui.label("In your new app:");
+                        ui.label("• Open “Authentication” in the left menu");
+                        ui.label("• Scroll down to “Allow public client flows”");
+                        ui.label("• Switch it to “Yes” and click Save");
+                    }
+                    2 => {
+                        big(ui, "3. Paste your client ID");
+                        ui.label("Open “Overview” and copy the “Application (client) ID”, then paste it here (Ctrl+V):");
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            ui.add(egui::TextEdit::singleline(&mut setup.client_id).hint_text("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx").desired_width(330.0).font(egui::TextStyle::Monospace));
+                            if looks_like_client_id(&setup.client_id) {
+                                ui.label(RichText::new("✔").color(GREEN).size(18.0));
+                            }
+                        });
+                        if !setup.client_id.trim().is_empty() && !looks_like_client_id(&setup.client_id) {
+                            ui.label(RichText::new("That doesn't look like a client ID yet - it has 5 groups like 1a2b3c4d-…").size(12.0).color(ORANGE));
+                        }
+                    }
+                    _ => {
+                        big(ui, "4. Ask Mojang for Minecraft access");
+                        ui.label("New apps need Mojang's OK to log into Minecraft. Fill in their short form with your client ID. Approval can take a few days; until then, sign-in stops at the last step with a message.");
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            if Self::accent_button(ui, "📝  Open Mojang's form", true).clicked() {
+                                let _ = open::that(MOJANG_REVIEW_URL);
+                            }
+                            if ui.button("📋 Copy client ID").clicked() {
+                                ui.ctx().copy_text(setup.client_id.trim().to_string());
+                            }
+                        });
+                    }
+                }
+                ui.add_space(12.0);
+                ui.horizontal(|ui| {
+                    if setup.step > 0 && ui.button("⬅ Back").clicked() {
+                        setup.step -= 1;
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if setup.step + 1 < STEPS {
+                            let ok = setup.step != 2 || looks_like_client_id(&setup.client_id);
+                            if Self::accent_button(ui, "Next ➡", ok).clicked() {
+                                setup.step += 1;
+                            }
+                        } else if Self::accent_button(ui, "✔  Save & sign in", true).clicked() {
+                            finish = true;
+                        }
+                    });
+                });
+            });
+        if finish {
+            let id = setup.client_id.trim().to_string();
+            self.settings.msa_client_id = id.clone();
+            config::save_settings(&self.settings);
+            self.ms_setup = None;
+            self.page = Page::Accounts;
+            self.start_ms_login(id);
+        } else if !open {
+            self.ms_setup = None;
+        }
+    }
+
     // ---------- settings ----------
 
     fn settings_page(&mut self, ui: &mut Ui) {
@@ -1518,7 +1668,7 @@ impl PaprikaApp {
                 ui.label(RichText::new("Microsoft client ID").strong());
                 ui.vertical(|ui| {
                     changed |= ui.add(egui::TextEdit::singleline(&mut self.settings.msa_client_id).hint_text("Azure application (client) ID").desired_width(380.0)).changed();
-                    ui.label(RichText::new("Needed for Microsoft sign-in. Register an app at portal.azure.com (personal accounts, public client flows on) - see the README.").size(12.0).color(TEXT_DIM));
+                    ui.label(RichText::new("Easiest: Accounts > “Set up Microsoft sign-in” walks you through it.").size(12.0).color(TEXT_DIM));
                 });
                 ui.end_row();
 
@@ -1761,5 +1911,6 @@ impl eframe::App for PaprikaApp {
             });
 
         self.new_instance_window(ctx);
+        self.ms_setup_window(ctx);
     }
 }

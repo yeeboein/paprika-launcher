@@ -18,11 +18,11 @@ What makes it different: **Modrinth is part of the launcher.** Browse mods, modp
 
 - 🌶️ **One-click Modrinth installs**: search, sort and install mods, resource packs and shaders straight into an instance. Results only show what works with that instance's Minecraft version and loader.
 - 📦 **Automatic dependencies**: install Iris and Sodium comes with it.
-- 🎁 **One-click modpacks**: install any Fabric/Quilt modpack from Modrinth and it becomes a ready-to-play instance.
+- 🎁 **One-click modpacks**: install any Fabric, Quilt, Forge or NeoForge modpack from Modrinth and it becomes a ready-to-play instance.
 - ⟳ **Update all mods** with one button (works for mods you added by hand too, as long as Modrinth knows them).
-- 🧵 **Fabric and Quilt** loaders, plus vanilla, for any Minecraft version.
+- 🧵 **Fabric, Quilt, Forge and NeoForge**, plus vanilla. Paprika installs the loader for you.
 - ☕ **Java included**: Paprika downloads the exact Java runtime each Minecraft version needs, so you never install Java yourself.
-- 👤 **Microsoft accounts** (device-code sign-in) and **offline accounts** for singleplayer/LAN.
+- 👤 **Microsoft accounts** with a built-in step-by-step setup wizard, plus **offline accounts** for singleplayer/LAN.
 - 🗂️ **Separate instances**, each with its own mods, worlds, settings and memory.
 - ✅ Enable/disable or remove mods, open folders, rename and delete instances.
 - 🖥️ Live game console.
@@ -67,14 +67,16 @@ CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=2 cargo build
 
 ## Microsoft sign-in setup
 
-Microsoft login needs an Azure app "client ID". Every third-party launcher has its own:
+Open **Accounts → Set up Microsoft sign-in**. A short wizard walks you through it, with buttons that open each page you need:
 
-1. Go to [portal.azure.com](https://portal.azure.com) → **App registrations** → **New registration**.
-2. Supported account types: **Personal Microsoft accounts only**.
-3. Open the app → **Authentication** → turn on **Allow public client flows**.
-4. Copy the **Application (client) ID**.
-5. New apps also need Minecraft API access: submit the app ID with [Mojang's review form](https://aka.ms/mce-reviewappid).
-6. Paste the ID into **Paprika Launcher → Settings → Microsoft client ID**, or bake it into builds by setting the `PAPRIKA_MSA_CLIENT_ID` environment variable at build time. For GitHub builds, add a repository *variable* with that name.
+1. Create a free Azure app (choose **Personal Microsoft accounts only**).
+2. Turn on **Allow public client flows**.
+3. Paste the **Application (client) ID**.
+4. Send the ID to Mojang with [their review form](https://aka.ms/mce-reviewappid). New apps need approval before they can log into Minecraft.
+
+After that, it's just **Sign in with Microsoft**.
+
+To skip this for everyone who downloads your builds, set the `PAPRIKA_MSA_CLIENT_ID` environment variable at build time. For GitHub builds, add a repository *variable* with that name.
 
 Offline accounts work without any of this.
 
@@ -94,7 +96,6 @@ Publish a release on GitHub (for example tag `v0.1.0`). The **Build** workflow b
 
 ## Roadmap
 
-- Forge / NeoForge support
 - Import instances from other launchers
 - Mod changelogs & version picker
 - Skin preview
