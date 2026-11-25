@@ -43,7 +43,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p dist/paprika
-          cp target/release/paprika assets/paprika.png assets/paprika.desktop README.md LICENSE dist/paprika/
+          cp target/release/paprika install.sh assets/paprika.png assets/paprika.desktop README.md LICENSE dist/paprika/
+          cp -r assets/icons dist/paprika/icons
           tar -C dist -czf dist/paprika-${{ matrix.name }}.tar.gz paprika
 
       - name: Package (Windows)

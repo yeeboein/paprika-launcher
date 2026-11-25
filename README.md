@@ -39,13 +39,13 @@ Get the latest build from [**Releases**](https://github.com/yeeboein/paprika-lau
 | Windows (x64) | `paprika-windows-x86_64.exe` (just run it) or the `.zip` |
 | Linux (x64) | `paprika-linux-x86_64.tar.gz` |
 
-**Linux:** extract and run `./paprika`. To add it to your app menu:
+**Linux:** extract it and run the installer. It adds Paprika Launcher, with its icon, to your app menu (no root needed):
 
 ```bash
-install -Dm755 paprika ~/.local/bin/paprika
-install -Dm644 paprika.png ~/.local/share/icons/hicolor/256x256/apps/paprika.png
-install -Dm644 paprika.desktop ~/.local/share/applications/paprika.desktop
+tar -xzf paprika-linux-x86_64.tar.gz && cd paprika && ./install.sh
 ```
+
+Run `./install.sh uninstall` to remove it. Your worlds are kept.
 
 ## Build from source
 
@@ -57,7 +57,13 @@ cd paprika-launcher
 cargo build --release
 ```
 
-The app ends up in `target/release/paprika` (or `paprika.exe`).
+The app ends up in `target/release/paprika` (or `paprika.exe`). On Linux, run `./install.sh` to add it to your app menu with its icon.
+
+Low on RAM (4 GB)? Build with lighter settings:
+
+```bash
+CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=2 cargo build --release -j 2
+```
 
 ## Microsoft sign-in setup
 
