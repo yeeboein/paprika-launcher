@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # Optional: set a repository variable named PAPRIKA_MSA_CLIENT_ID to bake
+  # your Azure app's client ID into the builds for Microsoft sign-in.
+  PAPRIKA_MSA_CLIENT_ID: ${{ vars.PAPRIKA_MSA_CLIENT_ID }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: linux-x86_64
+          - os: windows-latest
+            name: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/paprika
+          cp target/release/paprika assets/paprika.png assets/paprika.desktop README.md LICENSE dist/paprika/
+          tar -C dist -czf dist/paprika-${{ matrix.name }}.tar.gz paprika
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/paprika | Out-Null
+          Copy-Item target/release/paprika.exe, README.md, LICENSE dist/paprika/
+          Copy-Item target/release/paprika.exe dist/paprika-${{ matrix.name }}.exe
+          Compress-Archive -Path dist/paprika/* -DestinationPath dist/paprika-${{ matrix.name }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paprika-${{ matrix.name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.exe
+
+      # When you publish a release on GitHub, the builds get attached to it.
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.tar.gz dist/*.zip dist/*.exe --clobber

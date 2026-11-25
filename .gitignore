@@ -1,0 +1,3 @@
+target/
+*.paprika-part
+/paprika-data/

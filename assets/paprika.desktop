@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Paprika
+GenericName=Minecraft Launcher
+Comment=Lightweight Minecraft launcher with one-click Modrinth mods
+Exec=paprika
+Icon=paprika
+Terminal=false
+Categories=Game;
+Keywords=minecraft;launcher;mods;modrinth;fabric;quilt;
+StartupWMClass=paprika
