@@ -611,66 +611,64 @@ impl PaprikaApp {
                     for inst in &self.instances {
                         let running = self.is_running(&inst.id);
                         let launching = self.is_launching(&inst.id);
-                        let resp = ui
-                            .allocate_ui(vec2(210.0, 230.0), |ui| {
-                                let r = Frame::new()
-                                    .fill(CARD)
-                                    .corner_radius(12)
-                                    .inner_margin(12.0)
-                                    .show(ui, |ui| {
-                                        ui.set_width(186.0);
-                                        ui.set_height(206.0);
-                                        ui.vertical_centered(|ui| {
-                                            Self::instance_icon(ui, inst, 96.0);
-                                            ui.add_space(4.0);
-                                            ui.add(
-                                                egui::Label::new(
-                                                    RichText::new(&inst.name).size(15.0).strong(),
-                                                )
-                                                .truncate(),
-                                            );
-                                            ui.label(
-                                                RichText::new(inst.label())
-                                                    .color(TEXT_DIM)
-                                                    .size(12.0),
-                                            );
-                                            ui.add_space(4.0);
-                                            if running {
-                                                if theme::anim_button(
-                                                    ui,
-                                                    "■  Stop",
-                                                    CARD_HOVER,
-                                                    vec2(150.0, 30.0),
-                                                    14.0,
-                                                    true,
-                                                )
-                                                .clicked()
-                                                {
-                                                    action = Some((inst.id.clone(), "stop"));
-                                                }
-                                            } else if launching {
-                                                ui.add(egui::Spinner::new());
-                                            } else if theme::anim_button(
+                        // Claim the card's click area first so the Play button,
+                        // added later, sits on top of it and gets its own clicks.
+                        let (card_rect, resp) =
+                            ui.allocate_exact_size(vec2(210.0, 230.0), Sense::click());
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(card_rect), |ui| {
+                            Frame::new()
+                                .fill(CARD)
+                                .corner_radius(12)
+                                .inner_margin(12.0)
+                                .show(ui, |ui| {
+                                    ui.set_width(186.0);
+                                    ui.set_height(206.0);
+                                    ui.vertical_centered(|ui| {
+                                        Self::instance_icon(ui, inst, 96.0);
+                                        ui.add_space(4.0);
+                                        ui.add(
+                                            egui::Label::new(
+                                                RichText::new(&inst.name).size(15.0).strong(),
+                                            )
+                                            .truncate(),
+                                        );
+                                        ui.label(
+                                            RichText::new(inst.label()).color(TEXT_DIM).size(12.0),
+                                        );
+                                        ui.add_space(4.0);
+                                        if running {
+                                            if theme::anim_button(
                                                 ui,
-                                                "▶  Play",
-                                                ACCENT,
+                                                "■  Stop",
+                                                CARD_HOVER,
                                                 vec2(150.0, 30.0),
                                                 14.0,
                                                 true,
                                             )
                                             .clicked()
                                             {
-                                                action = Some((inst.id.clone(), "play"));
+                                                action = Some((inst.id.clone(), "stop"));
                                             }
-                                        });
+                                        } else if launching {
+                                            ui.add(egui::Spinner::new());
+                                        } else if theme::anim_button(
+                                            ui,
+                                            "▶  Play",
+                                            ACCENT,
+                                            vec2(150.0, 30.0),
+                                            14.0,
+                                            true,
+                                        )
+                                        .clicked()
+                                        {
+                                            action = Some((inst.id.clone(), "play"));
+                                        }
                                     });
-                                r.response
-                            })
-                            .inner;
-                        let resp = resp.interact(Sense::click());
+                                });
+                        });
                         let lift = ui.ctx().animate_bool_with_time(
                             resp.id.with("lift"),
-                            resp.hovered(),
+                            ui.rect_contains_pointer(card_rect),
                             0.15,
                         );
                         if lift > 0.01 {
