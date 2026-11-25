@@ -12,6 +12,8 @@ Paprika Launcher is a small, fast Minecraft: Java Edition launcher. It's one nat
 
 What makes it different: **Modrinth is part of the launcher.** Browse mods, modpacks, resource packs and shaders inside the app, click **Install**, and they go straight into your instance with their dependencies. You can add mods whenever you like, before or after you've started playing.
 
+🎬 **[Watch the 1-minute trailer](docs/paprika-trailer.mp4)**
+
 ![Browse Modrinth](docs/browse.png)
 
 ## Features
