@@ -522,6 +522,8 @@ impl PaprikaApp {
                     Loader::Vanilla => Color32::from_rgb(52, 60, 48),
                     Loader::Fabric => Color32::from_rgb(64, 52, 44),
                     Loader::Quilt => Color32::from_rgb(58, 46, 66),
+                    Loader::Forge => Color32::from_rgb(44, 52, 66),
+                    Loader::NeoForge => Color32::from_rgb(66, 50, 40),
                 };
                 ui.painter().rect_filled(rect, 8, bg);
                 theme::paint_logo(ui, rect.center(), size * 0.8);
@@ -798,7 +800,7 @@ impl PaprikaApp {
             }
         });
         if inst.loader == Loader::Vanilla {
-            ui.label(RichText::new("This is a vanilla instance. Make a Fabric or Quilt instance to use mods; resource packs and shaders still work here.").color(TEXT_DIM));
+            ui.label(RichText::new("This is a vanilla instance. Make a Fabric, Quilt, Forge or NeoForge instance to use mods; resource packs and shaders still work here.").color(TEXT_DIM));
         }
         ui.add_space(4.0);
         if self.content_cache.is_empty() {
@@ -1129,7 +1131,7 @@ impl PaprikaApp {
                 Some(i) if i.loader == Loader::Vanilla && self.browse.ptype == ProjectType::Mod => {
                     ui.label(
                         RichText::new(format!(
-                            "“{}” is vanilla - mods need a Fabric or Quilt instance.",
+                            "“{}” is vanilla - mods need a mod loader (Fabric, Quilt, Forge or NeoForge).",
                             i.name
                         ))
                         .color(ORANGE),

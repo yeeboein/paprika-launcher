@@ -4,6 +4,7 @@
 mod app;
 mod auth;
 mod config;
+mod forge;
 mod images;
 mod instance;
 mod java;
@@ -126,5 +127,66 @@ mod e2e {
             std::thread::sleep(Duration::from_millis(200));
         }
         assert!(t.error().is_none(), "{:?}", t.error());
+    }
+
+    fn launch_loader(name: &str, mc: &str, loader: Loader, mod_id: &str) {
+        let inst = Instance::create(name, mc, loader).unwrap();
+        let id = inst.id.clone();
+        let i2 = id.clone();
+        let m = mod_id.to_string();
+        run(move |t| modrinth::install(&i2, &m, "test mod", None, modrinth::ProjectType::Mod, t));
+        let running = launch::Running::default();
+        let r2 = running.clone();
+        let i3 = id.clone();
+        run(move |t| {
+            launch::launch(
+                &i3,
+                &auth::offline("PaprikaTest"),
+                &config::Settings::default(),
+                r2,
+                t,
+            )
+        });
+        std::thread::sleep(Duration::from_secs(60));
+        let log = std::fs::read_to_string(
+            Instance::load(&id)
+                .unwrap()
+                .game_dir()
+                .join("logs/latest.log"),
+        )
+        .unwrap_or_default();
+        if let Some(c) = running.lock().unwrap().get_mut(&id) {
+            let _ = c.kill();
+        };
+        for l in log
+            .lines()
+            .filter(|l| {
+                l.contains("ModLauncher")
+                    || l.contains("Loading")
+                    || l.contains("Created:")
+                    || l.contains("ERROR")
+            })
+            .take(15)
+        {
+            println!("{l}");
+        }
+        assert!(
+            log.contains("Created:") || log.contains("Reloading ResourceManager"),
+            "game didn't get to loading resources"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn neoforge() {
+        // Sodium also ships for NeoForge.
+        launch_loader("E2E NeoForge", "1.21.1", Loader::NeoForge, "AANobbMI");
+    }
+
+    #[test]
+    #[ignore]
+    fn forge() {
+        // Just Enough Items supports Forge 1.20.1.
+        launch_loader("E2E Forge", "1.20.1", Loader::Forge, "u6dRKJwZ");
     }
 }

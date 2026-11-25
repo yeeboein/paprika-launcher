@@ -12,16 +12,31 @@ pub enum Loader {
     Vanilla,
     Fabric,
     Quilt,
+    Forge,
+    NeoForge,
 }
 
 impl Loader {
-    pub const ALL: [Loader; 3] = [Loader::Vanilla, Loader::Fabric, Loader::Quilt];
+    pub const ALL: [Loader; 5] = [
+        Loader::Vanilla,
+        Loader::Fabric,
+        Loader::Quilt,
+        Loader::Forge,
+        Loader::NeoForge,
+    ];
+
+    /// Forge-style loaders need their installer run before launching.
+    pub fn is_forge_like(self) -> bool {
+        matches!(self, Loader::Forge | Loader::NeoForge)
+    }
 
     pub fn label(self) -> &'static str {
         match self {
             Loader::Vanilla => "Vanilla",
             Loader::Fabric => "Fabric",
             Loader::Quilt => "Quilt",
+            Loader::Forge => "Forge",
+            Loader::NeoForge => "NeoForge",
         }
     }
 
@@ -31,12 +46,14 @@ impl Loader {
             Loader::Vanilla => vec![],
             Loader::Fabric => vec!["fabric".into()],
             Loader::Quilt => vec!["quilt".into(), "fabric".into()],
+            Loader::Forge => vec!["forge".into()],
+            Loader::NeoForge => vec!["neoforge".into()],
         }
     }
 
     fn meta(self) -> Option<&'static str> {
         match self {
-            Loader::Vanilla => None,
+            Loader::Vanilla | Loader::Forge | Loader::NeoForge => None,
             Loader::Fabric => Some("https://meta.fabricmc.net/v2"),
             Loader::Quilt => Some("https://meta.quiltmc.org/v3"),
         }
@@ -57,6 +74,11 @@ struct LoaderInfo {
 
 /// Newest stable loader version for this Minecraft version.
 pub fn latest_loader(loader: Loader, mc: &str) -> Result<String> {
+    match loader {
+        Loader::Forge => return crate::forge::latest_forge(mc),
+        Loader::NeoForge => return crate::forge::latest_neoforge(mc),
+        _ => {}
+    }
     let Some(base) = loader.meta() else {
         bail!("vanilla has no loader")
     };

@@ -266,7 +266,7 @@ pub fn install(
     let inst = Instance::load(inst_id)?;
     if ptype == ProjectType::Mod && inst.loader == Loader::Vanilla {
         bail!(
-            "{} is a vanilla instance - mods need Fabric or Quilt",
+            "{} is a vanilla instance - mods need a mod loader (Fabric, Quilt, Forge or NeoForge)",
             inst.name
         );
     }
@@ -479,14 +479,9 @@ pub fn install_modpack(
         .iter()
         .find(|v| {
             v.version_type == "release"
-                && v.loaders
-                    .iter()
-                    .any(|l| l == "fabric" || l == "quilt" || l == "minecraft")
-        })
-        .or_else(|| {
-            versions
-                .iter()
-                .find(|v| v.loaders.iter().any(|l| l == "fabric" || l == "quilt"))
+                && v.loaders.iter().any(|l| {
+                    ["fabric", "quilt", "forge", "neoforge", "minecraft"].contains(&l.as_str())
+                })
         })
         .or(versions.first())
         .context("this modpack has no versions")?;
@@ -513,8 +508,10 @@ pub fn install_modpack(
         (Loader::Fabric, Some(l.to_string()))
     } else if let Some(l) = deps["quilt-loader"].as_str() {
         (Loader::Quilt, Some(l.to_string()))
-    } else if deps.get("forge").is_some() || deps.get("neoforge").is_some() {
-        bail!("{title} needs Forge/NeoForge, which Paprika doesn't support yet - try a Fabric or Quilt pack");
+    } else if let Some(l) = deps["neoforge"].as_str() {
+        (Loader::NeoForge, Some(l.to_string()))
+    } else if let Some(l) = deps["forge"].as_str() {
+        (Loader::Forge, Some(l.to_string()))
     } else {
         (Loader::Vanilla, None)
     };

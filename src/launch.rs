@@ -83,6 +83,31 @@ pub fn launch(
     let manifest = mojang::fetch_manifest()?;
     let vanilla = mojang::vanilla_version(&manifest, &inst.mc_version)?;
 
+    // Java
+    let java = if !settings.java_path.trim().is_empty() {
+        PathBuf::from(settings.java_path.trim())
+    } else {
+        let component = vanilla
+            .java_version
+            .as_ref()
+            .map(|j| j.component.clone())
+            .unwrap_or_else(|| "jre-legacy".into());
+        crate::java::ensure_runtime(&component, task)?
+    };
+
+    // Vanilla client jar (Forge's installer needs it too)
+    task.status("Checking game files");
+    let vanilla_jar = crate::paths::versions()
+        .join(&inst.mc_version)
+        .join(format!("{}.jar", inst.mc_version));
+    if let Some(c) = vanilla.downloads.as_ref().and_then(|d| d.client.as_ref()) {
+        net::download(
+            &net::Download::new(&c.url, &vanilla_jar)
+                .sha1(c.sha1.clone())
+                .size(c.size),
+        )?;
+    }
+
     let version: VersionJson = if inst.loader == Loader::Vanilla {
         vanilla.clone()
     } else {
@@ -98,37 +123,36 @@ pub fn launch(
             }
         };
         task.status(format!("Getting {} {lv}", inst.loader.label()));
-        mojang::merge(
-            vanilla.clone(),
-            loaders::profile(inst.loader, &inst.mc_version, &lv)?,
-        )
+        let profile = if inst.loader.is_forge_like() {
+            crate::forge::install(
+                inst.loader,
+                &inst.mc_version,
+                &lv,
+                &vanilla_jar,
+                &java,
+                task,
+            )?
+        } else {
+            loaders::profile(inst.loader, &inst.mc_version, &lv)?
+        };
+        mojang::merge(vanilla.clone(), profile)
     };
 
-    // Java
-    let java = if !settings.java_path.trim().is_empty() {
-        PathBuf::from(settings.java_path.trim())
+    // Forge excludes "<version id>.jar" from its module layer, so the game
+    // jar must carry the loader profile's name, like the official launcher.
+    let client_jar = if inst.loader.is_forge_like() {
+        let named = crate::paths::versions()
+            .join(&version.id)
+            .join(format!("{}.jar", version.id));
+        if !named.exists() {
+            std::fs::create_dir_all(named.parent().unwrap())?;
+            std::fs::copy(&vanilla_jar, &named)?;
+        }
+        named
     } else {
-        let component = vanilla
-            .java_version
-            .as_ref()
-            .map(|j| j.component.clone())
-            .unwrap_or_else(|| "jre-legacy".into());
-        crate::java::ensure_runtime(&component, task)?
+        vanilla_jar
     };
-
-    // Client jar + libraries
-    task.status("Checking game files");
-    let client_jar = crate::paths::versions()
-        .join(&inst.mc_version)
-        .join(format!("{}.jar", inst.mc_version));
     let mut downloads = vec![];
-    if let Some(c) = vanilla.downloads.as_ref().and_then(|d| d.client.as_ref()) {
-        downloads.push(
-            net::Download::new(&c.url, &client_jar)
-                .sha1(c.sha1.clone())
-                .size(c.size),
-        );
-    }
     let libs = mojang::plan_libraries(&version);
     downloads.extend(libs.downloads.iter().cloned());
     task.status("Downloading libraries");
